@@ -2,13 +2,14 @@ import requests
 import random
 import string
 from bs4 import BeautifulSoup
+import requests.cookies
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time
+import os
 import json
 from colorama import Fore, init
 import logging
@@ -16,68 +17,14 @@ import colorlog
 import pyfiglet
 import shutil
 init(autoreset=True)
-
 logging.addLevelName(25, 'SUCCESS')
 def success(self, message, *args, **kws):
     if self.isEnabledFor(25):
         self._log(25, message, args, **kws)
 logging.Logger.success = success
 
-class SeleniumBot:
-    def __init__(self):
-        self.options = Options()
-        # self.options.add_argument('--headless')
-        self.driver = webdriver.Chrome(options=self.options)
-        self.logger = logging.getLogger('SeleniumBot')
-        self.logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(asctime)s %(message)s [Line: %(lineno)d]",
-            datefmt="%Y-%m-%d %H:%M:%S",
-            log_colors={
-                'DEBUG': 'blue',
-                'INFO': 'green',
-                'WARNING': 'yellow',
-                'ERROR': 'red',
-                'CRITICAL': 'magenta',
-                'SUCCESS': 'green',
-            }
-        )
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+    
 
-    def login(self, mail, password):
-        self.logger.info("Logging in with email: %s", mail)
-        self.driver.get('https://mekobre.com/login')
-        self.driver.find_element(By.NAME, 'email').send_keys(mail)
-        self.driver.find_element(By.NAME, 'password').send_keys(password)
-        self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
-        self.logger.success("Logged in successfully")
-
-    def get_checksum(self, url):
-        self.logger.info("Getting checksum for URL: %s", url)
-        self.driver.get(url)
-        comment_element = self.driver.find_element(By.ID, 'comment')
-        self.driver.implicitly_wait(1)
-        ActionChains(self.driver).move_to_element(comment_element).perform()
-        comment_element.send_keys("1212341c34c1341c234")
-        comment_element.submit()
-        time.sleep(1)
-        page_source = self.driver.page_source
-        soup = BeautifulSoup(page_source, 'html.parser')
-        
-        # Find the div with the wire:snapshot attribute
-        div = soup.find('div', {'wire:snapshot': True})
-        if div:
-            wire_snapshot = div['wire:snapshot']
-            snapshot_data = json.loads(wire_snapshot)
-            checksum = snapshot_data.get('checksum')
-            self.logger.success("Checksum: %s", checksum)
-            return checksum
-        else:
-            self.logger.error("Checksum not found")
-            return None
 
 class Bot:
     def __init__(self):
@@ -104,11 +51,10 @@ class Bot:
             }
         )
         ch.setFormatter(formatter)
+    def display_banner(self):
         terminal_width = shutil.get_terminal_size().columns
-        ascii_banner = pyfiglet.figlet_format("Mekobre.com   Bot \n made by rat", font="slant", width=terminal_width)
+        ascii_banner = pyfiglet.figlet_format("Mekobre.com   Bot \n made by andria", font="slant", width=terminal_width)
         print(Fore.BLUE + ascii_banner)
-        self.get_csrf_token()
-
     def sign_up(self):
         self.logger.info("Signing up a new user")
         password = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -198,7 +144,7 @@ class Bot:
         self.checksum_comment = self.extract_checksum(response.text)
         return self.checksum_comment
 
-    def extract_snapshot(self, url):
+    def extract_snapshot(self, url, debug=False):
         self.logger.info("Extracting snapshot from URL: %s", url)
         self.url = url
         response = self.session.get(url)
@@ -214,6 +160,8 @@ class Bot:
             elif snapshot_name == "reaction-component":
                 self.wire_snapshot[1] = wire_snapshot
         self.logger.success("Snapshot extracted successfully")
+        if debug:
+            self.logger.debug("Snapshot: %s", self.wire_snapshot)
 
     def like_movie(self):
         self.logger.info("Liking movie")
@@ -243,17 +191,65 @@ class Bot:
             self.logger.error("Failed to like movie with status code: %s", response.status_code)
 
     def logout(self):
+        self.cookies = requests.cookies.RequestsCookieJar()
+        self.headers = {}
+        self.wire_snapshot = [[], []]
         self.logger.info("Logging out")
         response = requests.get('https://mekobre.com/logout', cookies=self.cookies, headers=self.headers)
         if response.ok:
             self.logger.success("Logged out successfully")
         else:
             self.logger.error("Failed to log out with status code: %s", response.status_code)
+class Tool(Bot):
+    def __init__(self):
+        super().__init__()
+    def main_menu(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        self.display_banner()
+        print(Fore.RED + "1. Start bot")
+        print(Fore.RED +  "2. Exit")
+        choice = input(Fore.BLUE + "Enter your choice: ")
+        if choice == '1':
+            self.start_bot()
+        elif choice == '2':
+            exit()
+        else:
+            self.main_menu()  
+    def start_bot(self, error=None):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        if not error == None:
+            print(Fore.RED + error)
+        movie_url = input(Fore.BLUE + "Enter movie URL: ")
+        if not "https://" in movie_url:
+            self.start_bot("Invalid URL")
+        comment = input(Fore.BLUE + "Enter comment: ")
+        if len(comment) < 4:
+            self.start_bot("Comment too short")
+        different_acconts  = input(Fore.BLUE + "Random Accounts(y/n): ")
+        if different_acconts.lower() == 'y':
+            self.extract_snapshot(movie_url, debug=True)
+            comment_count = input(Fore.BLUE + "Enter number of comments: ")
+            if not comment_count.isdigit():
+                self.start_bot("Invalid choice for comments")
+            for i in range(int(comment_count)):
+                self.logout()
+                self.get_csrf_token()
+                self.sign_up()
+                self.extract_snapshot(movie_url, debug=True)
+                self.post_comment(comment)
+        elif different_acconts.lower() == 'n':
+            self.get_csrf_token()
+            self.sign_up()
+            self.extract_snapshot(movie_url, debug=True)
+            comment_count = input(Fore.BLUE + "Enter number of comments: ")
+            if not comment_count.isdigit():
+                self.start_bot("Invalid choice for comments")
+            for i in range(int(comment_count)):
 
-bot = Bot()
-bot.sign_up()
-bot.extract_snapshot('https://mekobre.com/movie/kazino-ischiashi')
-bot.logger.info("Snapshot: %s", bot.wire_snapshot)
-bot.like_movie()
-bot.post_comment('wocdascasdw')
-bot.logout()
+                self.post_comment(comment)
+        else:
+            self.start_bot("Invalid choice for accounts")
+
+
+tool = Tool()
+tool.main_menu()
