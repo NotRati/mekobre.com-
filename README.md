@@ -24,4 +24,4 @@ Install all the requirements manually
   pip3 install colorama , logging, ...
 ```
     
-__ USE NEXTDNS FOR WINDOWS __
+** USE _NEXTDNS_ FOR WINDOWS **
